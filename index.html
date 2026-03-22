@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Ultimate Mask Studio & Jacker</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #0d1117; color: #c9d1d9; line-height: 1.4; }
+        .container { max-width: 900px; margin: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: #161b22; padding: 20px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        h1, h2 { color: #58a6ff; text-align: center; margin-top: 0; font-size: 1.2rem; }
+        
+        /* プロンプト生成セクション */
+        .prompt-box { grid-column: 1 / 3; background: #1c2128; border-left: 4px solid #f85149; }
+        .grid-select { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        select, input, textarea { width: 100%; background: #0d1117; color: #fff; border: 1px solid #30363d; padding: 8px; border-radius: 6px; box-sizing: border-box; }
+        
+        /* プレビュー・調整セクション */
+        .preview-area { background: #000; width: 320px; height: 240px; position: relative; margin: 10px auto; border: 2px solid #30363d; overflow: hidden; }
+        #maskPrev { position: absolute; pointer-events: none; object-fit: contain; }
+        
+        label { display: block; font-size: 0.8rem; margin-top: 8px; color: #8b949e; }
+        input[type="range"] { accent-color: #238636; }
+
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.2s; }
+        .btn-blue { background: #1f6feb; color: #fff; }
+        .btn-green { background: #238636; color: #fff; }
+        .btn-gray { background: #30363d; color: #fff; font-size: 0.8rem; }
+        .btn:hover { opacity: 0.8; }
+        
+        .result-text { font-family: monospace; font-size: 0.8rem; background: #000; color: #39d353; min-height: 60px; padding: 10px; border-radius: 6px; margin-top: 10px; border: 1px solid #30363d; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card prompt-box">
+        <h2>✨ 1. Gemini用プロンプト作成</h2>
+        <div class="grid-select">
+            <div>
+                <label>お面のテーマ</label>
+                <select id="pSubject">
+                    <option value="狐 (Fox)">狐 (Fox)</option>
+                    <option value="般若 (Hannya)">般若 (Hannya)</option>
+                    <option value="サイバーパンク・ロボット">ロボット (Robot)</option>
+                    <option value="猫 (Cat)">猫 (Cat)</option>
+                    <option value="宇宙人 (Alien)">宇宙人 (Alien)</option>
+                    <option value="騎士の兜 (Knight Helmet)">騎士の兜</option>
+                </select>
+            </div>
+            <div>
+                <label>スタイル</label>
+                <select id="pStyle">
+                    <option value="Cyberpunk, glowing neon">サイバーパンク</option>
+                    <option value="Traditional Japanese art">和風・伝統的</option>
+                    <option value="3D realistic, detailed">超リアル3D</option>
+                    <option value="Anime style, vibrant">アニメ調</option>
+                    <option value="Metallic, sci-fi">SF・メタリック</option>
+                </select>
+            </div>
+            <div>
+                <label>メインカラー</label>
+                <select id="pColor">
+                    <option value="Neon Blue">青</option>
+                    <option value="Crimson Red">赤</option>
+                    <option value="Emerald Green">緑</option>
+                    <option value="Gold">金</option>
+                    <option value="Purple and Pink">紫/ピンク</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-blue" onclick="makePrompt()">プロンプトを生成</button>
+        <div id="resPrompt" class="result-text" onclick="copyText('resPrompt')">ここにプロンプトが表示されます</div>
+        <p style="font-size:0.7rem; color:#8b949e; margin-top:5px;">↑これをコピーしてGeminiに「この動画を作って」と送ってください。</p>
+    </div>
+
+    <div class="card">
+        <h2>📂 2. 素材の読み込み</h2>
+        <label>Geminiで作った動画/画像を選択</label>
+        <input type="file" id="fileInp" accept="video/mp4, image/*">
+        
+        <label>位置 X: <span id="xVal">0</span></label>
+        <input type="range" id="xRange" min="-300" max="300" value="0">
+        <label>位置 Y: <span id="yVal">0</span></label>
+        <input type="range" id="yRange" min="-200" max="200" value="0">
+        <label>サイズ: <span id="sVal">200</span>px</label>
+        <input type="range" id="sRange" min="50" max="600" value = "200">
+    </div>
+
+    <div class="card">
+        <h2>📺 3. プレビュー & 実行</h2>
+        <div class="preview-area">
+            <video id="maskPrev" autoplay loop muted playsinline style="display:none;"></video>
+            <div style="position:absolute; bottom:5px; width:100%; text-align:center; color:#333; font-size:9px; pointer-events:none;">PREVIEW (640x480)</div>
+        </div>
+        <button class="btn btn-green" onclick="generateScript()">ジャックスクリプトを生成</button>
+        <textarea id="finalCode" readonly placeholder="スクリプトがここに表示されます"></textarea>
+        <button class="btn btn-gray" onclick="copyText('finalCode')">スクリプトをコピー</button>
+    </div>
+</div>
+
+<script>
+    const el = id => document.getElementById(id);
+    let fileData = "";
+    let isVideo = false;
+
+    // プロンプト生成ロジック
+    function makePrompt() {
+        const sub = el('pSubject').value;
+        const sty = el('pStyle').value;
+        const col = el('pColor').value;
+        const prompt = `Please generate a 5-second video for a camera mask. 
+Subject: A ${sub} mask, ${sty} style, primarily ${col} colors.
+Composition: Front-facing view, perfectly centered, close-up.
+Background: Solid pure white background. 
+Movement: Subtle breathing animation or glowing light pulses, loopable. 
+High quality, 3D rendered, clean edges.`;
+        el('resPrompt').innerText = prompt;
+    }
+
+    // プレビュー反映
+    el('fileInp').onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        isVideo = file.type.includes('video');
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            fileData = ev.target.result;
+            el('maskPrev').src = fileData;
+            el('maskPrev').style.display = 'block';
+            updateUI();
+        };
+        reader.readAsDataURL(file);
+    };
+
+    function updateUI() {
+        const s = el('sRange').value / 2;
+        const m = el('maskPrev');
+        m.style.width = s + 'px';
+        m.style.left = (160 + (el('xRange').value / 2) - (s / 2)) + 'px';
+        m.style.top = (120 + (el('yRange').value / 2) - (s / 2)) + 'px';
+        el('xVal').innerText = el('xRange').value;
+        el('yVal').innerText = el('yRange').value;
+        el('sVal').innerText = el('sRange').value;
+    }
+
+    ['xRange','yRange','sRange'].forEach(id => el(id).oninput = updateUI);
+
+    // スクリプト生成 (動画容量を考慮し、実行時にファイルを選択させる軽量版)
+    function generateScript() {
+        const x = el('xRange').value, y = el('yRange').value, s = el('sRange').value;
+        const code = `(function(){
+    const f=document.createElement('input'); f.type='file'; f.accept='video/mp4,image/*';
+    f.style='position:fixed;top:10px;left:10px;z-index:9999;background:#fff;color:#000;padding:5px;border-radius:5px;';
+    document.body.appendChild(f);
+    const v=document.createElement('video'), c=document.createElement('canvas'), ctx=c.getContext('2d'), m=document.createElement('video');
+    c.width=640; c.height=480; v.autoplay=v.playsinline=m.autoplay=m.loop=m.muted=true;
+    f.onchange=e=>{ m.src=URL.createObjectURL(e.target.files[0]); m.play(); f.style.display='none'; };
+    navigator.mediaDevices.getRealUserMedia=navigator.mediaDevices.getUserMedia;
+    navigator.mediaDevices.getUserMedia=async n=>{
+        if(!n.video) return navigator.mediaDevices.getRealUserMedia(n);
+        v.srcObject=await navigator.mediaDevices.getRealUserMedia({video:{width:640,height:480}});
+        const d=()=>{
+            ctx.drawImage(v,0,0,c.width,c.height);
+            if(m.src){
+                const sz=${s}, ix=(640-sz)/2+(${x}), iy=(480-sz)/2+(${y});
+                ctx.drawImage(m,ix,iy,sz,sz*(m.videoHeight/m.videoWidth||m.height/m.width||1));
+            }
+            requestAnimationFrame(d);
+        }; d(); return c.captureStream(30);
+    }; alert('準備完了。左上のボタンから動画を選んでください。');
+})();`;
+        el('finalCode').value = code;
+    }
+
+    function copyText(id) {
+        const t = el(id);
+        if(t.tagName === 'TEXTAREA') t.select();
+        navigator.clipboard.writeText(t.value || t.innerText);
+        alert("コピーしました！");
+    }
+</script>
+</body>
+</html>
